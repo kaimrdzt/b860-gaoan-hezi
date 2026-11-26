@@ -99,7 +99,7 @@ b860-高安盒子/
 | `build/build_bad_boot_package.py` | 只坏内核的包（反例） | 同上，输出 `B860_RESCUE_IMG` |
 | `build/build_persist_package.py` | 持久化启动包（RGB/1080p env） | `B860_V3_IMG`、`B860_ENV_V3`、`B860_V4_IMG` |
 | `build/aml.py` | 包解析/校验/组装 | `python aml.py info\|verify\|extract\|build` |
-| `probe/probe_uboot_cmds.ps1` | 批量探测可用命令 | `-Port COM14`、`-ProbeWaitMs` |
+| `probe/probe_uboot_cmds.ps1` | 批量探测可用命令 | `-Port`、`-ProbeWaitMs`、`-ExtraCmds`、`-CmdFile` |
 | `probe/uboot_cmd.ps1` | 提示符执行命令 | `-Cmds printenv` 等 |
 | `deploy/push_rootfs.py` | 推送 rootfs 到 eMMC | `B860_HOST`、`B860_ROOTFS_IMG`、`--seg`、`--verify` |
 | `deploy/dev.py` | 设备 TCP 命令通道 | `B860_HOST`、`B860_SHELL_PORT` |
@@ -124,10 +124,25 @@ python scripts\build\build_prompt_package.py
 
 ### 第 2 步：探索可用命令
 
+先验证串口执行证据，再跑批量探针：
+
 ```powershell
+# 2.1 确认命令能真正执行（预期回显 CHAN_42_OK + PROBE_OK）
+pwsh -NoProfile -File scripts\probe\uboot_cmd.ps1 -Port COM14 `
+     -Cmds 'if echo CHAN_$((6*7))_OK; then echo PROBE_OK; fi'
+
+# 2.2 批量探测安全命令（输出 OK / NO / UNKNOWN 汇总）
 pwsh -NoProfile -File scripts\probe\probe_uboot_cmds.ps1 -Port COM14
-# 输出 OK / NO / UNKNOWN 汇总，日志在 out\probe\probe-*.log
+
+# 2.3 追加自定义命令，或从文件批量读
+pwsh -NoProfile -File scripts\probe\probe_uboot_cmds.ps1 -Port COM14 `
+     -ExtraCmds 'help','bdinfo','iminfo'
+pwsh -NoProfile -File scripts\probe\probe_uboot_cmds.ps1 -Port COM14 -CmdFile cmds.txt
 ```
+
+日志在 `out\probe\probe-*.log`。
+`UNKNOWN` 的复核方法、有副作用命令的手动补测流程、结果归档格式，见
+[docs/02 §3 操作步骤](docs/02-command-audit.md#3-操作步骤逐步)。
 
 ### 第 3 步：刷入持久化 Linux 包
 

@@ -89,7 +89,12 @@ def make_bad_boot():
 
 def main():
     files = extract_items()
+    src_items = parse(SRC)['items']
+    v3_boot = [it for it in src_items
+               if it['name'] == 'boot' and it['fmt'] == 'PARTITION'][0]
     bad_boot, boot_size, bad_sha = make_bad_boot()
+    assert boot_size == v3_boot['size'], \
+        'kernel size %d != source boot item %d' % (boot_size, v3_boot['size'])
     print('bad boot: %d B  sha256 %s' % (boot_size, bad_sha[:16]))
 
     items = []

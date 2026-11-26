@@ -165,7 +165,7 @@ saveenv
 **mw（写内存）**
 
 ```sh
-mw.b <安全地址> 0x5a 1   # 只写 1 字节
+mw.b <确认空闲的地址> 0x5a 1   # 只写 1 字节；不要用仍在使用的载荷地址
 if itest.b *<安全地址> == 0x5a; then echo MW_OK; fi
 ```
 

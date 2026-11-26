@@ -66,27 +66,33 @@ b860-高安盒子/
 ├── LICENSE
 ├── docs/
 │   ├── 01-bad-package-fallback.md   坏包制作 + 自动回落 U-Boot（含失败反例）
-│   ├── 02-command-audit.md          探针方法 + 完整命令清单
+│   ├── 02-command-audit.md          探针方法 + 逐步操作 + 完整命令清单
 │   ├── 03-flash-linux-persist.md    刷 Linux 到 eMMC + 掉电自启
 │   ├── 04-kernel-build-network.md   内核编译 + 串口/网络调试
-│   └── 05-troubleshooting.md        常见问题排查
+│   ├── 05-troubleshooting.md        常见问题排查
+│   └── 06-end-to-end-checklist.md   端到端检查清单（8 阶段）
 ├── scripts/
 │   ├── build/
 │   │   ├── aml.py                    AML v2 包解析 / 校验 / 组装
 │   │   ├── build_prompt_package.py   双腿全断坏包（回落提示符，推荐）
 │   │   ├── build_bad_boot_package.py 单腿坏包（只坏内核，反例留档）
-│   │   └── build_persist_package.py  持久化启动包（v3 + 修正 env）
+│   │   ├── build_ubootshell.py       好内核 + 无 env/system 的提示符包
+│   │   └── build_persist_package.py  持久化启动包（修正 env）
 │   ├── probe/
 │   │   ├── probe_uboot_cmds.ps1      批量探针
 │   │   └── uboot_cmd.ps1             在提示符逐条发命令
+│   ├── flash/
+│   │   └── check_burnmode.ps1        判定冷 BootROM / U-Boot 从模式
 │   ├── deploy/
 │   │   ├── dev.py                    设备网络命令通道
 │   │   └── push_rootfs.py            rootfs 分片推送
-│   └── device/
-│       ├── restore_regs.sh           恢复 1080p 几何
-│       ├── gwctl.sh                  HTTP 网关（开机调度 restore）
-│       └── safe_reboot.sh            看门狗硬复位
+│   ├── device/
+│   │   ├── restore_regs.sh           恢复 1080p 几何
+│   │   ├── gwctl.sh                  HTTP 网关（开机调度 restore）
+│   │   └── safe_reboot.sh            看门狗硬复位
+│   └── display_model.py              显示几何模型 + 自测
 └── templates/
+    └── v4_spec.reference.json        持久化包 item 结构参考
 ```
 
 ---
@@ -98,11 +104,14 @@ b860-高安盒子/
 | `build/build_prompt_package.py` | 制作回落提示符的坏包 | `B860_V3_IMG`、`B860_V3_KERNEL`、`B860_PROMPT_IMG` |
 | `build/build_bad_boot_package.py` | 只坏内核的包（反例） | 同上，输出 `B860_RESCUE_IMG` |
 | `build/build_persist_package.py` | 持久化启动包（RGB/1080p env） | `B860_V3_IMG`、`B860_ENV_V3`、`B860_V4_IMG` |
+| `build/build_ubootshell.py` | 好内核 + 无 env/system 的提示符包 | `B860_V3_IMG`、`B860_V3_KERNEL`、`B860_UBOOTSHELL_IMG` |
 | `build/aml.py` | 包解析/校验/组装 | `python aml.py info\|verify\|extract\|build` |
 | `probe/probe_uboot_cmds.ps1` | 批量探测可用命令 | `-Port`、`-ProbeWaitMs`、`-ExtraCmds`、`-CmdFile` |
 | `probe/uboot_cmd.ps1` | 提示符执行命令 | `-Cmds printenv` 等 |
+| `flash/check_burnmode.ps1` | 判定烧录模式 | `-LogRoot`（烧录工具日志目录） |
 | `deploy/push_rootfs.py` | 推送 rootfs 到 eMMC | `B860_HOST`、`B860_ROOTFS_IMG`、`--seg`、`--verify` |
 | `deploy/dev.py` | 设备 TCP 命令通道 | `B860_HOST`、`B860_SHELL_PORT` |
+| `display_model.py` | 几何模型自测 | `--selftest` |
 
 ---
 
@@ -171,6 +180,9 @@ GXLX2:BL1 → DSH_AUTOBOOT → Linux version → Freeing unused kernel → B860A
 
 中间不需要任何按键。详细判定方法见
 [docs/03-flash-linux-persist.md](docs/03-flash-linux-persist.md)。
+
+> 完整的分阶段检查表（8 个阶段、每步通过条件、失败回退）见
+> [docs/06-end-to-end-checklist.md](docs/06-end-to-end-checklist.md)。
 
 ---
 

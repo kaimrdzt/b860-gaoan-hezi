@@ -1,0 +1,10 @@
+# 构建与运行时产物
+out/
+*.img
+*.bin
+*.raw
+*.log
+*.cpio
+*.gz
+__pycache__/
+*.pyc

@@ -2,7 +2,9 @@ param(
   [string]$Port = 'COM14',
   [int]$WaitForPort = 240,
   [int]$ProbeWaitMs = 1200,
-  [string]$LogDir = 'out\probe'
+  [string]$LogDir = 'out\probe',
+  [string]$CmdFile = '',
+  [string[]]$ExtraCmds = @()
 )
 # probe_uboot_cmds.ps1 — 批量探测精简版 U-Boot 的可用命令
 #
@@ -12,19 +14,26 @@ param(
 #       让 U-Boot 自己回一个标记，绕开“无回显”的干扰。
 #
 # 用法：
+#   # 1) 默认安全列表
 #   pwsh -NoProfile -File scripts\probe\probe_uboot_cmds.ps1 -Port COM14
 #
+#   # 2) 追加自定义命令
+#   pwsh -NoProfile -File scripts\probe\probe_uboot_cmds.ps1 -Port COM14 -ExtraCmds 'help','bdinfo','iminfo'
+#
+#   # 3) 只测命令文件里的命令（每行一个，# 开头为注释）
+#   pwsh -NoProfile -File scripts\probe\probe_uboot_cmds.ps1 -Port COM14 -CmdFile cmds.txt
+#
 # 注意：
-#   - 只探测“无副作用、不阻塞”的命令。reset/reboot/fastboot/update/loadb/loady/
-#     store erase|write|scrub/efuse write 等危险命令不在自动列表里，见 docs/02。
+#   - 只自动探测“无副作用、不阻塞”的命令。reset/reboot/fastboot/update/loadb/loady/
+#     store erase|write|scrub/efuse write 等危险命令不在自动列表里，见 docs/02 §7。
 #   - 串口必须独占，运行前关闭其它串口工具。
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir | Out-Null }
 $tag = Get-Date -Format 'yyyyMMdd-HHmmss'
 $log = Join-Path $LogDir "probe-$tag.log"
 
-# 安全探测集合（裸命令应当只打印 usage 或立即返回）
-$probes = @(
+# 默认安全探测集合（裸命令应当只打印 usage 或立即返回）
+$defaultProbes = @(
   'printenv', 'echo', 'test', 'sleep', 'md', 'md.b', 'md.w',
   'cp.b', 'cmp.b', 'crc32', 'base',
   'store', 'imgread', 'mmcinfo', 'usb', 'fatload',
@@ -48,6 +57,18 @@ $known = @(
   @{ Cmd = 'wipeisb'; Note = '语义未知，慎用' },
   @{ Cmd = 'tftpboot'; Note = '网络下载，需要 serverip' }
 )
+
+# 组装探测列表
+if ($CmdFile) {
+  if (-not (Test-Path $CmdFile)) { throw "CmdFile not found: $CmdFile" }
+  $list = Get-Content $CmdFile | ForEach-Object { $_.Trim() } |
+          Where-Object { $_ -and -not $_.StartsWith('#') }
+  $mode = "file:$CmdFile"
+} else {
+  $list = $defaultProbes + $ExtraCmds | Select-Object -Unique
+  $mode = 'default'
+}
+if (-not $list) { throw 'empty probe list' }
 
 # 等待串口空闲
 $deadline = (Get-Date).AddSeconds($WaitForPort)
@@ -100,14 +121,14 @@ function Read-Until {
 $lines = [System.Collections.Generic.List[string]]::new()
 function Log { param([string]$s) $lines.Add($s); Write-Host $s }
 
-Log "=== probe start $tag port=$Port ==="
+Log "=== probe start $tag port=$Port mode=$mode count=$($list.Count) ==="
 $sp.Write("`r")
 Start-Sleep -Milliseconds 600
 Log ("ready: " + (($sp.ReadExisting() -replace "`r", ' ').Trim()))
 
 $idx = 0
 $ok = 0; $no = 0; $unknown = 0
-foreach ($cmd in $probes) {
+foreach ($cmd in $list) {
   $idx++
   $mOk = "PB_OK_$idx"
   $mNo = "PB_NO_$idx"
@@ -115,6 +136,8 @@ foreach ($cmd in $probes) {
   Write-Slow $expr
   $out = Read-Until -marker $mOk -timeoutMs $ProbeWaitMs
   $text = $out.ToString()
+  $clean = ($text -replace "[`r`n]+", ' ').Trim()
+  if ($clean.Length -gt 120) { $clean = $clean.Substring(0, 120) + '...' }
   if ($text -match [regex]::Escape($mOk)) {
     Log ("[OK]   {0,-14} {1}" -f $cmd, $mOk)
     $ok++
@@ -122,7 +145,7 @@ foreach ($cmd in $probes) {
     Log ("[NO]   {0,-14} {1}" -f $cmd, $mNo)
     $no++
   } else {
-    Log ("[?]    {0,-14} (no marker; output may be trimmed)" -f $cmd)
+    Log ("[?]    {0,-14} no marker | raw: {1}" -f $cmd, $clean)
     $unknown++
   }
   Start-Sleep -Milliseconds 150

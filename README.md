@@ -114,7 +114,7 @@ b860-高安盒子/
 | 脚本 | 用途 | 关键环境变量 / 参数 |
 |---|---|---|
 | `build/build_prompt_package.py` | 制作回落提示符的坏包 | `B860_V3_IMG`、`B860_V3_KERNEL`、`B860_PROMPT_IMG` |
-| `build/build_bad_boot_package.py` | 只坏内核的包（反例） | 同上，输出 `B860_RESCUE_IMG` |
+| `build/build_bad_boot_package.py` | 单腿坏包（只坏内核，反例；`--restore` 可恢复 boot 分区） | 同上，输出 `B860_RESCUE_IMG` |
 | `build/build_persist_package.py` | 持久化启动包（RGB/1080p env） | `B860_V3_IMG`、`B860_ENV_V3`、`B860_V4_IMG` |
 | `build/build_ubootshell.py` | 好内核 + 无 env/system 的提示符包 | `B860_V3_IMG`、`B860_V3_KERNEL`、`B860_UBOOTSHELL_IMG` |
 | `build/aml.py` | 包解析/校验/组装 | `python aml.py info\|verify\|extract\|build` |
@@ -235,7 +235,7 @@ go 0x0E000000
 | 大小 | 64 KiB |
 | 格式 | `u32 CRC32` + `key=value\0...` |
 | CRC 覆盖 | `blob[4:65536]` |
-| 写入方式 | **只能通过烧录包内的 env item**；裸写 `0x38000000` 无效 |
+| 写入方式 | 烧录包内的 env item；或提示符上 `setenv` + `saveenv`。**裸写 `0x38000000` 无效** |
 
 ---
 
@@ -263,6 +263,7 @@ go 0x0E000000
 | 5 | 烧录工具版本 | 记录中出现多个版本，建议先用 2.2.4 |
 | 6 | SSH 验证状态 | 现有记录只验证 telnet:23 / nc:2323 / HTTP:8080，SSH 未验证（见 docs/04） |
 | 7 | v3/v4 镜像与 rootfs 分发 | 不含 1GB 级二进制，需自行准备 |
+| 8 | 内核版本 | 记录中出现 6.12.115 与 7.x 两种产物；以源包内实际内核为准（`uname -r` 确认） |
 
 ---
 

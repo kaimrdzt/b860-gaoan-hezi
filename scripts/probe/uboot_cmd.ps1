@@ -3,7 +3,7 @@ param(
   [string[]]$Cmds = @('printenv'),
   [int]$WaitForPort = 240,
   [int]$AfterMs = 2500,
-  [string]$LogDir = 'D:\b860\out\ubootshell'
+  [string]$LogDir = 'D:\b860\out\probe'
 )
 # uboot-cmd.ps1 — 在 gxl_p211_v1# 提示符上逐条发送命令并捕获输出
 # 用法: powershell -File scripts\uboot-cmd.ps1 -Port COM14 -Cmds printenv,help

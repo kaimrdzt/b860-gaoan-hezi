@@ -244,20 +244,25 @@ def cmd_build(spec_path, out_path):
 
 
 def main():
-    if len(sys.argv) < 3:
+    expected = {'info': 3, 'verify': 3, 'extract': 4, 'build': 4}
+    if len(sys.argv) < 2:
         print(__doc__)
         return 2
     cmd = sys.argv[1]
+    if cmd not in expected:
+        print('未知命令', cmd)
+        return 2
+    if len(sys.argv) != expected[cmd]:
+        print('参数数量错误：%s 需要 %d 个参数' % (cmd, expected[cmd] - 2))
+        print(__doc__)
+        return 2
     if cmd == 'info':
         return cmd_info(sys.argv[2]) or 0
     if cmd == 'verify':
         return cmd_verify(sys.argv[2])
     if cmd == 'extract':
         return cmd_extract(sys.argv[2], sys.argv[3]) or 0
-    if cmd == 'build':
-        return cmd_build(sys.argv[2], sys.argv[3])
-    print('未知命令', cmd)
-    return 2
+    return cmd_build(sys.argv[2], sys.argv[3])
 
 
 if __name__ == '__main__':

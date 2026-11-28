@@ -8,7 +8,7 @@
   原因未完全定位（管道与重定向在 busybox nc 上的行为差异），但两段式已实测可靠：
     step1  nc > /tmp/chunk.bin        (14 MiB/s)
     step2  dd if=/tmp/chunk.bin of=/dev/mmcblk2 bs=1M seek=N conv=notrunc  (0.02s / 10MiB)
-  受 tmpfs 限制（空闲 ~855 MB），分片取 512 MiB。
+  受 tmpfs 限制（空闲 ~855 MB），分片取 256 MiB。
 
 用法:
   python3 scripts/push_rootfs.py                  # 全量 5 片
@@ -153,7 +153,7 @@ def slice_to_chunk(rel_mib, size):
 
 
 def sample_offsets(size, n=3, win=4 << 20):
-    """片内抽样窗口偏移（字节）。全量 sha256 在设备上太慢（512 MiB > 300s 超时），
+    """片内抽样窗口偏移（字节）。全量 sha256 在设备上太慢（256 MiB > 300s 超时），
     改用首/中/尾三段各 4 MiB 抽样，读 eMMC 仅 12 MiB，秒级完成。"""
     if size <= win:
         return [0]
@@ -210,6 +210,15 @@ def device_sha(rel_mib, size):
     return details[0][2] if details else None
 
 
+def confirm_emmc_write(targets):
+    if not sys.stdin.isatty():
+        raise SystemExit('拒绝在非交互终端写入 eMMC；请先在终端确认已备份，或仅使用 --verify')
+    print(f'即将向 {EMMC} 从偏移 {OFFSET_MIB} MiB 写入 {len(targets)} 段，覆盖现有 eMMC 数据。')
+    answer = input('请先确认已备份；输入 YES 继续: ').strip()
+    if answer != 'YES':
+        raise SystemExit('已取消，未写入 eMMC')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seg', type=int, default=None)
@@ -233,6 +242,8 @@ def main():
 
     targets = [p for p in plan if args.seg is None or p[0] == args.seg]
     fails = []
+    if targets and not args.verify:
+        confirm_emmc_write(targets)
 
     for i, rel_mib, size in targets:
         print(f'--- seg {i}/{len(plan)-1}: image+{rel_mib} MiB, {size/(1<<20):.1f} MiB ---')

@@ -29,7 +29,8 @@ SPEC = os.environ.get('B860_RESCUE_SPEC', 'out/rescue_spec.json')
 # --restore 模式：内核不破坏，仅恢复 boot 分区（不动 system/rootfs）
 RESTORE = '--restore' in sys.argv
 if RESTORE:
-    DST = 'out/batocera-2.1t/B860AV21T_BOOTRESTORE_arm64_20261113.img'
+    DST = os.environ.get('B860_RESCUE_IMG',
+                         'out/batocera-2.1t/B860AV21T_BOOTRESTORE_arm64_20261113.img')
 
 # 需要保留的 item（按原顺序，system 除外）
 KEEP = [('DDR', 'USB'), ('DDR_ENC', 'USB'), ('UBOOT', 'USB'), ('UBOOT_ENC', 'USB'),
@@ -94,7 +95,10 @@ def main():
         assert it['size'] == v3[it['name']]['size'], \
             'size mismatch %s: %d vs %d' % (it['name'], it['size'], v3[it['name']]['size'])
 
-    json.dump({'items': items}, open(SPEC, 'w', encoding='utf-8'))
+    os.makedirs(os.path.dirname(SPEC) or '.', exist_ok=True)
+    with open(SPEC, 'w', encoding='utf-8') as f:
+        json.dump({'items': items}, f)
+    os.makedirs(os.path.dirname(DST) or '.', exist_ok=True)
     if os.path.exists(DST):
         os.remove(DST)
     cmd_build(SPEC, DST)

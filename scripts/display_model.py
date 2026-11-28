@@ -108,21 +108,30 @@ def selftest():
     c.true('修正值保留 bit24（缩放使能）', bool(VSC_CTRL0_FIXED & (1 << 24)))
 
     print('[4] 与 osdfix.sh 的一致性（曾用错 0x1d00 段）')
-    of = _read('out/deb13-new/osdfix.sh')
-    for name, reg, val in APPLIED:
-        token = '0x%04x:0x%08x' % (reg * 4, val)
-        c.true('osdfix 含 %s (%s)' % (name, token), token in of, 'missing')
+    of_path = os.path.join(ROOT, 'out/deb13-new/osdfix.sh')
+    if os.path.exists(of_path):
+        of = _read('out/deb13-new/osdfix.sh')
+        for name, reg, val in APPLIED:
+            token = '0x%04x:0x%08x' % (reg * 4, val)
+            c.true('osdfix 含 %s (%s)' % (name, token), token in of, 'missing')
+    else:
+        print('  SKIP osdfix.sh: out/deb13-new/osdfix.sh 不存在（干净检出）')
 
     print('[5] 源码位宽（回归）')
-    bc = _read('out/rashim/blit_core.h')
-    c.true('blit_core.h 为 3 字节像素', '#define CB 3' in bc)
-    c.true('blit_core.h 无显存回读', 'memcpy(dst, dst - stride' not in bc)
-    sh = _read('out/shim/shim.c')
-    c.true('shim.c 为 24bpp 画布',
-           'CANVAS_BYTES   3' in sh or 'CANVAS_BYTES 3' in sh)
-    au = _read('out/deb13-new/autostart.sh')
-    c.true('autostart 调用 osdfix.sh', 'osdfix.sh' in au)
-    c.true('autostart 不再内联写 0x86F', '0x0000086f' not in au)
+    refs = [
+        ('out/rashim/blit_core.h', 'blit_core.h 为 3 字节像素', ('#define CB 3',), True),
+        ('out/rashim/blit_core.h', 'blit_core.h 无显存回读', ('memcpy(dst, dst - stride',), False),
+        ('out/shim/shim.c', 'shim.c 为 24bpp 画布', ('CANVAS_BYTES   3', 'CANVAS_BYTES 3'), True),
+        ('out/deb13-new/autostart.sh', 'autostart 调用 osdfix.sh', ('osdfix.sh',), True),
+        ('out/deb13-new/autostart.sh', 'autostart 不再内联写 0x86F', ('0x0000086f',), False),
+    ]
+    for rel, name, tokens, want in refs:
+        if not os.path.exists(os.path.join(ROOT, rel)):
+            print('  SKIP %s: %s 不存在（干净检出）' % (name, rel))
+            continue
+        content = _read(rel)
+        found = any(token in content for token in tokens)
+        c.true(name, found == want)
 
     print('\n==== %d PASS / %d FAIL ====' % (c.n - c.fail, c.fail))
     return 1 if c.fail else 0
